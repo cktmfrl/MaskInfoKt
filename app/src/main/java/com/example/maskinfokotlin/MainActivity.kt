@@ -10,9 +10,10 @@ import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -28,17 +29,17 @@ class MainActivity : AppCompatActivity() {
     @Inject
     lateinit var storeAdapter: StoreAdapter
 
-//    private val requestPermission =
-//        registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { map ->
-//            if (map[Manifest.permission.ACCESS_FINE_LOCATION]!!
-//                && map[Manifest.permission.ACCESS_COARSE_LOCATION]!!
-//            ) {
-//                viewModel.fetchStoreInfo()
-//                //performAction()
-//            } else {
-//                toast("권한이 거부되었습니다.")
-//            }
-//        }
+    private val permissions = arrayOf(
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    )
+
+    // TODO 안드로이드 29에서는 여기로 권한 승인 결과가 반환되지 않음. 안드로이드 32 이상으로 변경하여 테스트 진행.
+    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (it.all { permission -> permission.value == true }) {
+            performAction()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,22 +63,18 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        performAction()
+        if (!checkSelfPermission(permissions)) {
+            requestPermission.launch(permissions)
+        }
+    }
+
+    private fun checkSelfPermission(permissions: Array<String>): Boolean {
+        return permissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
     }
 
     private fun performAction() {
-        // 권한 설정
-        if (ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED
-            && ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            val permissions = arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
-            ActivityCompat.requestPermissions(this, permissions, 0)
-
-            return
-        }
-
         // 위치 정보 설정
         val locationManager = getSystemService(LOCATION_SERVICE) as LocationManager
         if (!locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)
@@ -95,42 +92,29 @@ class MainActivity : AppCompatActivity() {
         viewModel.fetchStoreInfo()
     }
 
-    // 권한 설정
+    // TODO 안드로이드 29에서는 여기로 권한 승인 결과가 반환됨. 안드로이드 32 이상으로 변경하여 테스트 진행.
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
 
-        when (requestCode) {
-            0 -> {
-                if (grantResults.isNotEmpty()) {
-                    var isAllGranted = true
-                    for (grant in grantResults) {
-                        if (grant != PackageManager.PERMISSION_GRANTED) {
-                            isAllGranted = false
-                            break
-                        }
-                    }
+        if (grantResults.all { it == PackageManager.PERMISSION_GRANTED }) {
+            performAction()
+        } else {
+            val map = permissions.groupBy {
+                if (shouldShowRequestPermissionRationale(it)) "DENIED" else "EXPLAINED"
+            }
 
-                    if (isAllGranted) {
-                        performAction()
-                    } else {
-                        // Permission Denied
-                        // If you reject permission, you can not use this service\n\nPlease turn on permissions at [Setting] > [Permission]
-                        alert("권한을 거부할 경우 본 서비스를 이용하실 수 없습니다.\n\n[설정] > [권한]에서 권한을 켜주세요.") {
-                            okButton {
-                                // 애플리케이션 정보
-                                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                                intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                                val uri: Uri = Uri.fromParts("package", packageName, null)
-                                intent.data = uri
-                                startActivity(intent)
-                            }
-                            cancelButton {
-                                toast("권한이 거부되었습니다.")
-                            }
-                        }.show()
+            map["EXPLAINED"]?.let {
+                alert("권한을 거부할 경우 본 서비스를 이용하실 수 없습니다.\n\n[설정] > [권한]에서 권한을 켜주세요.") {
+                    okButton {
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                        val uri: Uri = Uri.fromParts("package", packageName, null)
+                        intent.data = uri
+                        startActivity(intent)
                     }
-                }
-
+                    cancelButton {
+                    }
+                }.show()
             }
         }
     }
@@ -143,7 +127,9 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_refresh -> {
-                performAction()
+                if (!checkSelfPermission(permissions)) {
+                    requestPermission.launch(permissions)
+                }
                 true
             }
             else -> super.onOptionsItemSelected(item)
