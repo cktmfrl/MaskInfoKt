@@ -5,7 +5,6 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import androidx.databinding.BindingAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.example.maskinfokotlin.databinding.ItemStoreBinding
 import com.example.maskinfokotlin.model.Store
@@ -31,41 +30,44 @@ class StoreAdapter : RecyclerView.Adapter<StoreViewHolder>() {
     }
 
     override fun onBindViewHolder(holder: StoreViewHolder, position: Int) {
-        holder.binding.store = mItems[position]
+        //holder.binding.store = mItems[position]
+        val store: Store = mItems[position]
+        holder.binding.nameTextView.text = store.name
+        holder.binding.addrTextView.text = store.addr
+        holder.binding.distanceTextView.text = "1km"
+
+        var remainStat = "충분"
+        var count = "10개 이상"
+        var color = Color.GREEN
+        when (store.remain_stat) {
+            "plenty" -> {
+                remainStat = "충분"
+                count = "100개 이상"
+                color = Color.GREEN
+            }
+            "some" -> {
+                remainStat = "여유"
+                count = "30개 이상"
+                color = Color.YELLOW
+            }
+            "few" -> {
+                remainStat = "매진 임박"
+                count = "2개 이상"
+                color = Color.RED
+            }
+            "empty" -> {
+                remainStat = "재고 없음"
+                count = "1개 이하"
+                color = Color.GRAY
+            }
+            else -> {
+            }
+        }
+        holder.binding.remainTextView.text = remainStat
+        holder.binding.countTextView.text = count
+        holder.binding.remainTextView.setTextColor(color)
+        holder.binding.countTextView.setTextColor(color)
     }
 
     override fun getItemCount() = mItems.size
-}
-
-
-@BindingAdapter("remainStat")
-fun setRemainStat(view: TextView, remainStat: String) {
-    view.text = when (remainStat) {
-        "plenty" -> "충분"
-        "some" -> "여유"
-        "few" -> "매진 임박"
-        else -> "재고 없음"
-    }
-}
-
-@BindingAdapter("count")
-fun setCount(view: TextView, remainStat: String) {
-    view.text = when (remainStat) {
-        "plenty" -> "100개 이상"
-        "some" -> "30개 이상"
-        "few" -> "2개 이상"
-        else -> "1개 이하"
-    }
-}
-
-@BindingAdapter("color")
-fun setColor(view: TextView, remainStat: String) {
-    when (remainStat) {
-        "plenty" -> Color.GREEN
-        "some" -> Color.YELLOW
-        "few" -> Color.RED
-        else -> Color.GRAY
-    }.apply {
-        view.setTextColor(this)
-    }
 }
