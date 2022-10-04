@@ -1,14 +1,19 @@
 package com.example.maskinfokotlin
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.location.LocationManager
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.Observer
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -18,7 +23,37 @@ import org.jetbrains.anko.*
 class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
 
-    val storeAdapter = StoreAdapter()
+    private val storeAdapter = StoreAdapter()
+
+    private val permissions = arrayOf(
+        Manifest.permission.ACCESS_COARSE_LOCATION,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    )
+
+    private val requestPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { permissions ->
+        val denideList = permissions.filter { it.value == false }
+        if (denideList.isNotEmpty()) {
+            performAction()
+        } else {
+            alert("권한을 거부할 경우 본 서비스를 이용하실 수 없습니다.\n\n[설정] > [권한]에서 권한을 켜주세요.") {
+                okButton {
+                    val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                    val uri: Uri = Uri.fromParts("package", packageName, null)
+                    intent.data = uri
+                    startActivity(intent)
+                }
+                cancelButton {
+                }
+            }.show()
+        }
+    }
+
+    private fun checkSelfPermission(permissions: Array<String>): Boolean {
+        return permissions.all {
+            ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +78,9 @@ class MainActivity : AppCompatActivity() {
             })
         }
 
-        performAction()
+        if (!checkSelfPermission(permissions)) {
+            requestPermission.launch(permissions)
+        }
     }
 
     private fun performAction() {
@@ -72,7 +109,9 @@ class MainActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.action_refresh -> {
-                performAction()
+                if (!checkSelfPermission(permissions)) {
+                    requestPermission.launch(permissions)
+                }
                 true
             }
             else -> super.onOptionsItemSelected(item)
